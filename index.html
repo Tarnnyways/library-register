@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ลงทะเบียน - ห้องสมุด บก.กฝ.ฯ</title>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family:'Sarabun', sans-serif; background:#f4f6f8; margin:0; padding:20px; }
+  .card { background:#fff; border-radius:14px; padding:20px; box-shadow:0 1px 4px rgba(0,0,0,.08); max-width:420px; margin:0 auto; }
+  h2 { font-size:18px; color:#1f2d3d; margin-top:0; }
+  label { display:block; font-size:14px; color:#374151; margin:14px 0 6px; }
+  input, select { width:100%; padding:10px 12px; border:1px solid #d1d5db; border-radius:8px; font-size:15px; font-family:inherit; }
+  button { width:100%; margin-top:20px; padding:12px; background:#2563eb; color:#fff; border:none; border-radius:8px; font-size:16px; cursor:pointer; }
+  button:disabled { background:#93c5fd; }
+  .msg { text-align:center; font-size:14px; margin-top:12px; }
+  .error { color:#dc2626; }
+  .success { color:#16a34a; }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <h2>📚 ลงทะเบียนใช้งานห้องสมุด บก.กฝ.ฯ</h2>
+
+  <label>ชื่อ-สกุล (พร้อมยศ)</label>
+  <input type="text" id="fullName" placeholder="เช่น ส.ต.ท.หญิง ดวงหทัย เอี่ยมฉ่ำ">
+
+  <label>ตำแหน่ง</label>
+  <input type="text" id="position" placeholder="เช่น เจ้าหน้าที่ธุรการ">
+
+  <label>หน่วยงาน</label>
+  <select id="unit">
+    <option value="">-- เลือกหน่วยงาน --</option>
+    <option value="กฝ.บช.ตชด.">กฝ.บช.ตชด.</option>
+    <option value="กองร้อยที่ 1">กองร้อยที่ 1</option>
+    <option value="กองร้อยที่ 2">กองร้อยที่ 2</option>
+    <option value="กองร้อยที่ 3">กองร้อยที่ 3</option>
+    <option value="กองร้อยที่ 4">กองร้อยที่ 4</option>
+    <option value="ฝ่ายอำนวยการ">ฝ่ายอำนวยการ</option>
+    <option value="ฝ่ายธุรการ">ฝ่ายธุรการ</option>
+    <option value="ฝ่ายส่งกำลังบำรุง">ฝ่ายส่งกำลังบำรุง</option>
+    <option value="อื่นๆ">อื่นๆ</option>
+  </select>
+
+  <button id="submitBtn" onclick="submitForm()" disabled>กำลังเชื่อมต่อ...</button>
+  <div class="msg" id="msg"></div>
+</div>
+
+<script>
+// ===== แก้ 2 ค่านี้ให้ตรงกับของจริง =====
+const LIFF_ID = "REPLACE_WITH_YOUR_LIFF_ID";
+const WEBAPP_URL = "REPLACE_WITH_YOUR_APPS_SCRIPT_EXEC_URL"; // ลงท้าย /exec (ไม่ต้องมี ?page=register ต่อท้ายตรงนี้)
+// =========================================
+
+let userId = null;
+let displayName = null;
+
+async function init() {
+  const timeoutMsg = setTimeout(function() {
+    document.getElementById('msg').innerHTML =
+      '<span class="error">เชื่อมต่อ LINE ช้าผิดปกติ — กรุณาปิดหน้านี้แล้วกดปุ่ม "ลงทะเบียน" ใหม่จากแชท LINE</span>';
+  }, 8000);
+
+  try {
+    await liff.init({ liffId: LIFF_ID });
+    clearTimeout(timeoutMsg);
+
+    if (!liff.isLoggedIn()) {
+      liff.login({ redirectUri: window.location.href });
+      return;
+    }
+
+    const profile = await liff.getProfile();
+    userId = profile.userId;
+    displayName = profile.displayName;
+
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = false;
+    btn.innerText = 'ลงทะเบียน';
+  } catch (err) {
+    clearTimeout(timeoutMsg);
+    document.getElementById('msg').innerHTML =
+      '<span class="error">เชื่อมต่อ LINE ไม่ได้ (' + (err && err.message ? err.message : err) + ')</span>';
+  }
+}
+
+async function submitForm() {
+  const fullName = document.getElementById('fullName').value.trim();
+  const position = document.getElementById('position').value.trim();
+  const unit = document.getElementById('unit').value;
+  const msgEl = document.getElementById('msg');
+
+  if (!fullName || !position || !unit) {
+    msgEl.innerHTML = '<span class="error">กรุณากรอกข้อมูลให้ครบทุกช่อง</span>';
+    return;
+  }
+  if (!userId) {
+    msgEl.innerHTML = '<span class="error">ไม่พบข้อมูลผู้ใช้ LINE กรุณาเปิดผ่านแอป LINE</span>';
+    return;
+  }
+
+  document.getElementById('submitBtn').disabled = true;
+  msgEl.innerHTML = 'กำลังบันทึก...';
+
+  try {
+    // ใช้ Content-Type: text/plain เพื่อเลี่ยง CORS preflight (Apps Script เว็บแอปไม่รองรับ preflight)
+    const res = await fetch(WEBAPP_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({
+        action: 'register',
+        userId: userId,
+        displayName: displayName,
+        fullName: fullName,
+        position: position,
+        unit: unit,
+      }),
+    });
+    const data = await res.json();
+
+    if (data.status === 'ok') {
+      msgEl.innerHTML = '<span class="success">ลงทะเบียนสำเร็จ ✅ ปิดหน้านี้แล้วกลับไปแชทได้เลย</span>';
+      setTimeout(function() {
+        if (liff.isInClient()) liff.closeWindow();
+      }, 1500);
+    } else {
+      document.getElementById('submitBtn').disabled = false;
+      msgEl.innerHTML = '<span class="error">' + (data.message || 'เกิดข้อผิดพลาด') + '</span>';
+    }
+  } catch (err) {
+    document.getElementById('submitBtn').disabled = false;
+    msgEl.innerHTML = '<span class="error">ส่งข้อมูลไม่สำเร็จ: ' + err + '</span>';
+  }
+}
+
+init();
+</script>
+
+</body>
+</html>
