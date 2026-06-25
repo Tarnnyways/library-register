@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard สถิติการร้องขอตำราฝึก - บก.กฝ.บช.ตชด.</title>
+<style>
+  body { font-family: 'Sarabun', sans-serif; background:#f4f6f8; margin:0; padding:24px; }
+  h1 { font-size:20px; color:#1f2d3d; }
+  .tabs { display:flex; gap:8px; margin:16px 0; flex-wrap:wrap; }
+  .tab { padding:8px 16px; background:#fff; border:1px solid #ddd; border-radius:8px; cursor:pointer; }
+  .tab.active { background:#2563eb; color:#fff; border-color:#2563eb; }
+  .cards { display:flex; gap:16px; margin-bottom:24px; flex-wrap:wrap; }
+  .card { background:#fff; border-radius:12px; padding:16px 24px; box-shadow:0 1px 3px rgba(0,0,0,0.1); flex:1; min-width:200px; }
+  .card .num { font-size:28px; font-weight:700; color:#2563eb; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media (max-width: 700px) { .grid { grid-template-columns:1fr; } }
+  table { width:100%; border-collapse:collapse; background:#fff; border-radius:8px; overflow:hidden; }
+  th, td { text-align:left; padding:10px 14px; border-bottom:1px solid #eee; font-size:14px; }
+  th { background:#f1f5f9; }
+  .status { color:#94a3b8; font-size:13px; padding:8px 0; }
+  .error { color:#dc2626; }
+</style>
+</head>
+<body>
+
+<h1>📊 สถิติการร้องขอตำราฝึก บก.กฝ.บช.ตชด.</h1>
+
+<div class="tabs">
+  <div class="tab active" data-m="1">1 เดือน</div>
+  <div class="tab" data-m="3">3 เดือน</div>
+  <div class="tab" data-m="6">6 เดือน</div>
+  <div class="tab" data-m="12">12 เดือน</div>
+</div>
+
+<div id="statusMsg" class="status">กำลังโหลดข้อมูล...</div>
+
+<div class="cards">
+  <div class="card"><div>จำนวนการร้องขอทั้งหมด</div><div class="num" id="total">-</div></div>
+</div>
+
+<div class="grid">
+  <div>
+    <h3>ตำราที่ถูกขอมากที่สุด</h3>
+    <table id="tblBooks"><thead><tr><th>#</th><th>ชื่อตำรา</th><th>จำนวนครั้ง</th></tr></thead><tbody></tbody></table>
+  </div>
+  <div>
+    <h3>หน่วยที่ร้องขอมากที่สุด</h3>
+    <table id="tblUnits"><thead><tr><th>#</th><th>หน่วย</th><th>จำนวนครั้ง</th></tr></thead><tbody></tbody></table>
+  </div>
+</div>
+
+<script>
+// ===== แก้ค่านี้ให้ตรงกับของจริง =====
+const WEBAPP_URL = "REPLACE_WITH_YOUR_APPS_SCRIPT_EXEC_URL"; // ลงท้าย /exec
+// =====================================
+
+async function loadStats(months) {
+  document.getElementById('statusMsg').style.display = 'block';
+  document.getElementById('statusMsg').className = 'status';
+  document.getElementById('statusMsg').innerText = 'กำลังโหลดข้อมูล...';
+  try {
+    const res = await fetch(WEBAPP_URL + '?period=' + months);
+    const data = await res.json();
+    renderStats(data);
+    document.getElementById('statusMsg').style.display = 'none';
+  } catch (err) {
+    document.getElementById('statusMsg').className = 'status error';
+    document.getElementById('statusMsg').innerText = 'โหลดข้อมูลไม่สำเร็จ: ' + err;
+  }
+}
+
+function renderStats(data) {
+  document.getElementById('total').innerText = data.total_requests;
+
+  const tblBooks = document.querySelector('#tblBooks tbody');
+  tblBooks.innerHTML = '';
+  data.top_books.forEach(function(b, i) {
+    tblBooks.innerHTML += '<tr><td>' + (i+1) + '</td><td>' + escapeHtml(b.name) + '</td><td>' + b.count + '</td></tr>';
+  });
+
+  const tblUnits = document.querySelector('#tblUnits tbody');
+  tblUnits.innerHTML = '';
+  data.by_unit.forEach(function(u, i) {
+    tblUnits.innerHTML += '<tr><td>' + (i+1) + '</td><td>' + escapeHtml(u.name) + '</td><td>' + u.count + '</td></tr>';
+  });
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, function(c) {
+    return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+  });
+}
+
+document.querySelectorAll('.tab').forEach(function(tab) {
+  tab.addEventListener('click', function() {
+    document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+    tab.classList.add('active');
+    loadStats(tab.dataset.m);
+  });
+});
+
+loadStats(1);
+</script>
+
+</body>
+</html>
